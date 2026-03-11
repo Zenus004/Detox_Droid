@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">Detox_Droid</string>
+    <string name="app_name">Detox Droid</string>
+    <string name="accessibility_desc">Required to detect when a blocked app is opened and display the detox overlay to help you focus.</string>
 </resources>
