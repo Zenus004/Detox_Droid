@@ -36,7 +36,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -82,7 +81,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ScheduleScreen(
@@ -94,36 +92,12 @@ fun ScheduleScreen(
     val sheetState   = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope        = rememberCoroutineScope()
 
-    Scaffold(
-        containerColor = BackgroundDeepest,
-        floatingActionButton = {
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(
-                        Brush.linearGradient(listOf(PrimaryNeon, SecondaryNeon))
-                    )
-                    .clickable { setShowAddSheet(true) },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Rounded.Add,
-                    contentDescription = "Add Schedule",
-                    tint     = Color.Black,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-        }
-    ) { innerPadding ->
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDeepest)
-                .padding(innerPadding)
-        ) {
-            // ── Ambient orbs ─────────────────────────────────────────────────
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundDeepest)
+    ) {
+        // ── Ambient orbs ───────────────────────────────────────
             Box(
                 modifier = Modifier
                     .size(260.dp)
@@ -151,7 +125,7 @@ fun ScheduleScreen(
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
 
-                // ── Header ───────────────────────────────────────────────────
+                // ── Header ────────────────────────────────────────────
                 item {
                     Box(
                         modifier = Modifier
@@ -195,7 +169,7 @@ fun ScheduleScreen(
                     }
                 }
 
-                // ── Loading ───────────────────────────────────────────────────
+                // ── Loading ────────────────────────────────────────────
                 if (state.isLoading) {
                     item {
                         Box(
@@ -213,7 +187,7 @@ fun ScheduleScreen(
                     }
                 }
 
-                // ── Empty state ───────────────────────────────────────────────
+                // ── Empty state ─────────────────────────────────────────
                 else if (state.schedules.isEmpty()) {
                     item {
                         Box(
@@ -271,23 +245,25 @@ fun ScheduleScreen(
                                 style = OverlineTextStyle,
                                 color = TextMuted
                             )
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(percent = 50))
-                                    .background(PurpleAccent.copy(alpha = 0.10f))
-                                    .border(
-                                        1.dp,
-                                        PurpleAccent.copy(alpha = 0.25f),
-                                        RoundedCornerShape(percent = 50)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(percent = 50))
+                                        .background(PurpleAccent.copy(alpha = 0.10f))
+                                        .border(
+                                            1.dp,
+                                            PurpleAccent.copy(alpha = 0.25f),
+                                            RoundedCornerShape(percent = 50)
+                                        )
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text  = "${state.schedules.size} total",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = PurpleAccent
                                     )
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text  = "${state.schedules.size} total",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = PurpleAccent
-                                )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(12.dp))
@@ -304,8 +280,28 @@ fun ScheduleScreen(
                     }
                 }
 
-                item { Spacer(modifier = Modifier.height(100.dp)) }
+                item { Spacer(modifier = Modifier.height(140.dp)) }
             }
+
+        // ── Floating Action Button ───────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 24.dp)
+                .size(60.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(
+                    Brush.linearGradient(listOf(PrimaryNeon, SecondaryNeon))
+                )
+                .clickable { setShowAddSheet(true) },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Rounded.Add,
+                contentDescription = "Add Schedule",
+                tint     = Color.Black,
+                modifier = Modifier.size(26.dp)
+            )
         }
 
         // ── Add Schedule Bottom Sheet ─────────────────────────────────────────
@@ -334,10 +330,6 @@ fun ScheduleScreen(
     }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// SCHEDULE ITEM CARD  (signature unchanged)
-// ══════════════════════════════════════════════════════════════════════════════
-
 @Composable
 fun ScheduleItemCard(
     schedule: DetoxScheduleEntity,
@@ -349,7 +341,7 @@ fun ScheduleItemCard(
     val endLabel   = formatter.format(Date(schedule.endTimeInMillis))
 
     val accentColor by animateColorAsState(
-        targetValue   = if (schedule.isActive) PrimaryNeon else TextGray,
+        targetValue   = if (schedule.isActive) PurpleAccent else TextGray,
         animationSpec = tween(300),
         label         = "scheduleAccent"
     )
@@ -370,7 +362,7 @@ fun ScheduleItemCard(
                 width = 1.dp,
                 brush = if (schedule.isActive)
                     Brush.horizontalGradient(
-                        listOf(PrimaryNeon.copy(alpha = 0.40f), PurpleAccent.copy(alpha = 0.25f))
+                        listOf(PurpleAccent.copy(alpha = 0.40f), PurpleAccent.copy(alpha = 0.25f))
                     )
                 else
                     Brush.horizontalGradient(listOf(GlassBorder, GlassBorder)),
@@ -446,7 +438,7 @@ fun ScheduleItemCard(
                     onCheckedChange = onToggle,
                     colors          = SwitchDefaults.colors(
                         checkedThumbColor   = Color.Black,
-                        checkedTrackColor   = PrimaryNeon,
+                        checkedTrackColor   = PurpleAccent,
                         uncheckedThumbColor = TextGray,
                         uncheckedTrackColor = SurfaceVariant
                     )
@@ -507,10 +499,6 @@ private fun DaysPillRow(daysString: String, activeColor: Color) {
         }
     }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// ADD SCHEDULE BOTTOM SHEET  (signature unchanged)
-// ══════════════════════════════════════════════════════════════════════════════
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -748,10 +736,6 @@ private fun AddScheduleSheet(
         }
     }
 }
-
-// ══════════════════════════════════════════════════════════════════════════════
-// TIME PICKER COLUMN  (signature unchanged)
-// ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
 private fun TimePickerColumn(

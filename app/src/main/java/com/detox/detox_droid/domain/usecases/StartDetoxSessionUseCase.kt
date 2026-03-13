@@ -8,9 +8,10 @@ class StartDetoxSessionUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val dndHelper: DndHelper
 ) {
-    suspend operator fun invoke(durationInMillis: Long) {
+    suspend operator fun invoke(durationInMillis: Long, isScheduled: Boolean = false) {
         val endTime = System.currentTimeMillis() + durationInMillis
         settingsRepository.setDetoxSessionEndTime(endTime)
+        settingsRepository.setIsScheduledSession(isScheduled)
         settingsRepository.setDetoxModeActive(true)
 
         dndHelper.enableDnd()

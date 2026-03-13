@@ -27,25 +27,25 @@ fun AppNavGraph(
         modifier = Modifier.padding(innerPadding)
     ) {
         composable(NavRoutes.DASHBOARD) {
-            DashboardScreen(navController)
+            DashboardScreen()
         }
         composable(NavRoutes.FOCUS_MODE) {
-            FocusModeScreen(navController)
+            FocusModeScreen()
         }
         composable(NavRoutes.SCHEDULES) {
-            ScheduleScreen(navController)
+            ScheduleScreen()
         }
         composable(NavRoutes.APP_BLOCKING_CONFIG) {
-            AppBlockingConfigScreen(navController)
+            AppBlockingConfigScreen()
         }
         composable(NavRoutes.DOOM_SCROLLING) {
-            DoomScrollingScreen(navController)
+            DoomScrollingScreen()
         }
         composable(NavRoutes.STATISTICS) {
-            StatisticsScreen(navController)
+            StatisticsScreen()
         }
         composable(NavRoutes.SETTINGS) {
-            SettingsScreen(navController)
+            SettingsScreen()
         }
         composable(NavRoutes.SPLASH_OR_PERMISSIONS) {
             SplashScreen(navController)

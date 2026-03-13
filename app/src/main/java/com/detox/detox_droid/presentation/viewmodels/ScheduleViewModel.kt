@@ -3,6 +3,7 @@ package com.detox.detox_droid.presentation.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.detox.detox_droid.data.local.room.entity.DetoxScheduleEntity
+import com.detox.detox_droid.data.services.SchedulerManager
 import com.detox.detox_droid.domain.repository_interfaces.DetoxScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,7 +20,8 @@ data class ScheduleState(
 
 @HiltViewModel
 class ScheduleViewModel @Inject constructor(
-    private val scheduleRepository: DetoxScheduleRepository
+    private val scheduleRepository: DetoxScheduleRepository,
+    private val schedulerManager: SchedulerManager
 ) : ViewModel() {
 
     val uiState: StateFlow<ScheduleState> = scheduleRepository.getAllSchedules()
@@ -39,18 +41,21 @@ class ScheduleViewModel @Inject constructor(
         )
         viewModelScope.launch {
             scheduleRepository.insertSchedule(entity)
+            schedulerManager.checkNow()
         }
     }
 
     fun deleteSchedule(schedule: DetoxScheduleEntity) {
         viewModelScope.launch {
             scheduleRepository.deleteSchedule(schedule)
+            schedulerManager.checkNow()
         }
     }
 
     fun toggleSchedule(schedule: DetoxScheduleEntity, isActive: Boolean) {
         viewModelScope.launch {
             scheduleRepository.updateSchedule(schedule.copy(isActive = isActive))
+            schedulerManager.checkNow()
         }
     }
 }

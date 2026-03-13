@@ -1,6 +1,7 @@
 package com.detox.detox_droid.data.local.datastore
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,7 +16,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SecureSettingsManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @field:ApplicationContext private val context: Context
 ) {
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -38,6 +39,9 @@ class SecureSettingsManager @Inject constructor(
 
     private val _detoxSessionEndTime = MutableStateFlow(sharedPreferences.getLong(KEY_DETOX_SESSION_END_TIME, 0L))
     val detoxSessionEndTime: Flow<Long> = _detoxSessionEndTime.asStateFlow()
+
+    private val _isScheduledSession = MutableStateFlow(sharedPreferences.getBoolean(KEY_IS_SCHEDULED_SESSION, false))
+    val isScheduledSession: Flow<Boolean> = _isScheduledSession.asStateFlow()
 
     private val _pauseEndTime = MutableStateFlow(sharedPreferences.getLong(KEY_PAUSE_END_TIME, 0L))
     val pauseEndTime: Flow<Long> = _pauseEndTime.asStateFlow()
@@ -69,28 +73,35 @@ class SecureSettingsManager @Inject constructor(
 
     suspend fun updateDailyPauseLimit(limit: Int) {
         withContext(Dispatchers.IO) {
-            sharedPreferences.edit().putInt(KEY_DAILY_PAUSE_LIMIT, limit).apply()
+            sharedPreferences.edit { putInt(KEY_DAILY_PAUSE_LIMIT, limit) }
         }
         _dailyPauseLimit.update { limit }
     }
 
     suspend fun setDetoxModeActive(isActive: Boolean) {
         withContext(Dispatchers.IO) {
-            sharedPreferences.edit().putBoolean(KEY_DETOX_MODE_ACTIVE, isActive).apply()
+            sharedPreferences.edit { putBoolean(KEY_DETOX_MODE_ACTIVE, isActive) }
         }
         _isDetoxModeActive.update { isActive }
     }
 
     suspend fun setDetoxSessionEndTime(endTimeInMillis: Long) {
         withContext(Dispatchers.IO) {
-            sharedPreferences.edit().putLong(KEY_DETOX_SESSION_END_TIME, endTimeInMillis).apply()
+            sharedPreferences.edit { putLong(KEY_DETOX_SESSION_END_TIME, endTimeInMillis) }
         }
         _detoxSessionEndTime.update { endTimeInMillis }
     }
 
+    suspend fun setIsScheduledSession(isScheduled: Boolean) {
+        withContext(Dispatchers.IO) {
+            sharedPreferences.edit { putBoolean(KEY_IS_SCHEDULED_SESSION, isScheduled) }
+        }
+        _isScheduledSession.update { isScheduled }
+    }
+
     suspend fun setPauseEndTime(endTimeInMillis: Long) {
         withContext(Dispatchers.IO) {
-            sharedPreferences.edit().putLong(KEY_PAUSE_END_TIME, endTimeInMillis).apply()
+            sharedPreferences.edit { putLong(KEY_PAUSE_END_TIME, endTimeInMillis) }
         }
         _pauseEndTime.update { endTimeInMillis }
     }
@@ -100,12 +111,18 @@ class SecureSettingsManager @Inject constructor(
             val today = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
             val lastDay = sharedPreferences.getInt(KEY_LAST_PAUSE_DAY, -1)
             val count = if (today != lastDay) {
-                sharedPreferences.edit().putInt(KEY_LAST_PAUSE_DAY, today).apply()
+                sharedPreferences.edit { putInt(KEY_LAST_PAUSE_DAY, today) }
                 1
             } else {
                 sharedPreferences.getInt(KEY_CURRENT_PAUSE_COUNT, 0) + 1
             }
-            sharedPreferences.edit().putInt(KEY_CURRENT_PAUSE_COUNT, count).apply()
+            sharedPreferences.edit { putInt(KEY_CURRENT_PAUSE_COUNT, count) }
+        }
+    }
+
+    suspend fun getDetoxSessionEndTime(): Long {
+        return withContext(Dispatchers.IO) {
+            sharedPreferences.getLong(KEY_DETOX_SESSION_END_TIME, 0L)
         }
     }
 
@@ -119,14 +136,14 @@ class SecureSettingsManager @Inject constructor(
 
     suspend fun setDoomScrollEnabled(enabled: Boolean) {
         withContext(Dispatchers.IO) {
-            sharedPreferences.edit().putBoolean(KEY_DOOM_SCROLL_ENABLED, enabled).apply()
+            sharedPreferences.edit { putBoolean(KEY_DOOM_SCROLL_ENABLED, enabled) }
         }
         _doomScrollEnabled.update { enabled }
     }
 
     suspend fun setDoomScrollThresholdMinutes(minutes: Int) {
         withContext(Dispatchers.IO) {
-            sharedPreferences.edit().putInt(KEY_DOOM_SCROLL_THRESHOLD_MINS, minutes).apply()
+            sharedPreferences.edit { putInt(KEY_DOOM_SCROLL_THRESHOLD_MINS, minutes) }
         }
         _doomScrollThresholdMinutes.update { minutes }
     }
@@ -134,7 +151,7 @@ class SecureSettingsManager @Inject constructor(
     /** [trackedPackages] is a comma-separated string of package names. */
     suspend fun setDoomScrollTrackedApps(trackedPackages: String) {
         withContext(Dispatchers.IO) {
-            sharedPreferences.edit().putString(KEY_DOOM_SCROLL_TRACKED_APPS, trackedPackages).apply()
+            sharedPreferences.edit { putString(KEY_DOOM_SCROLL_TRACKED_APPS, trackedPackages) }
         }
         _doomScrollTrackedApps.update { trackedPackages }
     }
@@ -158,5 +175,6 @@ class SecureSettingsManager @Inject constructor(
         private const val KEY_DOOM_SCROLL_ENABLED = "doom_scroll_enabled"
         private const val KEY_DOOM_SCROLL_THRESHOLD_MINS = "doom_scroll_threshold_mins"
         private const val KEY_DOOM_SCROLL_TRACKED_APPS = "doom_scroll_tracked_apps"
+        private const val KEY_IS_SCHEDULED_SESSION = "is_scheduled_session"
     }
 }

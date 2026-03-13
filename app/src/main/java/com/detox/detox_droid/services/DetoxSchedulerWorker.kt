@@ -30,7 +30,17 @@ class DetoxSchedulerWorker @AssistedInject constructor(
             val schedules = detoxScheduleRepository.getAllSchedules().first()
             
             val calendar = Calendar.getInstance()
-            val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK).toString()
+            val dayName = when (calendar.get(Calendar.DAY_OF_WEEK)) {
+                Calendar.SUNDAY -> "Sun"
+                Calendar.MONDAY -> "Mon"
+                Calendar.TUESDAY -> "Tue"
+                Calendar.WEDNESDAY -> "Wed"
+                Calendar.THURSDAY -> "Thu"
+                Calendar.FRIDAY -> "Fri"
+                Calendar.SATURDAY -> "Sat"
+                else -> ""
+            }
+            
             val currentTimeOfDayMillis = calendar.get(Calendar.HOUR_OF_DAY) * 3600000L +
                     calendar.get(Calendar.MINUTE) * 60000L
 
@@ -38,9 +48,12 @@ class DetoxSchedulerWorker @AssistedInject constructor(
             var durationToEndMillis = 0L
 
             for (schedule in schedules) {
-                if (schedule.isActive && schedule.daysOfWeek.contains(dayOfWeek)) {
-                    val start = schedule.startTimeInMillis
-                    val end = schedule.endTimeInMillis
+                if (schedule.isActive && schedule.daysOfWeek.contains(dayName)) {
+                    val startCal = Calendar.getInstance().apply { timeInMillis = schedule.startTimeInMillis }
+                    val endCal = Calendar.getInstance().apply { timeInMillis = schedule.endTimeInMillis }
+                    
+                    val start = startCal.get(Calendar.HOUR_OF_DAY) * 3600000L + startCal.get(Calendar.MINUTE) * 60000L
+                    val end = endCal.get(Calendar.HOUR_OF_DAY) * 3600000L + endCal.get(Calendar.MINUTE) * 60000L
                     
                     if (start < end) {
                         if (currentTimeOfDayMillis in start..end) {
@@ -65,11 +78,16 @@ class DetoxSchedulerWorker @AssistedInject constructor(
 
             if (shouldBeDetoxing && !isCurrentlyDetoxing) {
                 Timber.d("Starting scheduled detox session")
-                startDetoxSessionUseCase(durationToEndMillis)
+                startDetoxSessionUseCase(durationToEndMillis, isScheduled = true)
             } else if (!shouldBeDetoxing && isCurrentlyDetoxing) {
                 val sessionEndTime = settingsRepository.detoxSessionEndTime.first()
-                if (System.currentTimeMillis() >= sessionEndTime && sessionEndTime != 0L) {
-                    Timber.d("Ending scheduled/manual detox session")
+                val isScheduledSession = settingsRepository.isScheduledSession.first()
+
+                if (isScheduledSession) {
+                    Timber.d("Ending scheduled detox session (schedule over or deleted)")
+                    stopDetoxSessionUseCase()
+                } else if (System.currentTimeMillis() >= sessionEndTime && sessionEndTime != 0L) {
+                    Timber.d("Ending manual detox session")
                     stopDetoxSessionUseCase()
                 }
             }

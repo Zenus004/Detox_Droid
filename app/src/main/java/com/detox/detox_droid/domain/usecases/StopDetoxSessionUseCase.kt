@@ -10,6 +10,7 @@ class StopDetoxSessionUseCase @Inject constructor(
 ) {
     suspend operator fun invoke() {
         settingsRepository.setDetoxSessionEndTime(0L)
+        settingsRepository.setIsScheduledSession(false)
         settingsRepository.setDetoxModeActive(false)
 
         dndHelper.disableDnd()

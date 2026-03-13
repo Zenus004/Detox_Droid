@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+-dontwarn com.google.errorprone.annotations.**
+
+# Keep our Room Entities, DAOs, and Domain Models safe from Obfuscation
+# If R8 renames fields in these models, Room/SQL mappings break silently in Release
+-keep class com.detox.detox_droid.data.local.room.entity.** { *; }
+-keep class com.detox.detox_droid.data.local.room.dao.** { *; }
+-keep class com.detox.detox_droid.domain.models.** { *; }
+-keep class com.detox.detox_droid.data.local.datastore.** { *; }

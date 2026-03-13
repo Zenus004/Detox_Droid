@@ -18,6 +18,9 @@ class SettingsRepositoryImpl @Inject constructor(
     override val detoxSessionEndTime: Flow<Long>
         get() = secureSettingsManager.detoxSessionEndTime
 
+    override val isScheduledSession: Flow<Boolean>
+        get() = secureSettingsManager.isScheduledSession
+
     override val pauseEndTime: Flow<Long>
         get() = secureSettingsManager.pauseEndTime
 
@@ -33,12 +36,20 @@ class SettingsRepositoryImpl @Inject constructor(
         secureSettingsManager.setDetoxSessionEndTime(endTimeInMillis)
     }
 
+    override suspend fun setIsScheduledSession(isScheduled: Boolean) {
+        secureSettingsManager.setIsScheduledSession(isScheduled)
+    }
+
     override suspend fun setPauseEndTime(endTimeInMillis: Long) {
         secureSettingsManager.setPauseEndTime(endTimeInMillis)
     }
 
     override suspend fun incrementPauseCount() {
         secureSettingsManager.incrementPauseCount()
+    }
+
+    override suspend fun getDetoxSessionEndTime(): Long {
+        return secureSettingsManager.getDetoxSessionEndTime()
     }
 
     override suspend fun getDailyPausesRemaining(): Int {
