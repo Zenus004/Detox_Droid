@@ -16,7 +16,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SecureSettingsManager @Inject constructor(
-    @field:ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)

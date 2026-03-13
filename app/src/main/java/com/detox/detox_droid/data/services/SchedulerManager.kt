@@ -14,7 +14,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SchedulerManager @Inject constructor(
-    @field:ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     @Suppress("unused")
     fun enqueueDetoxWorker() {
