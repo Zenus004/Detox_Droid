@@ -27,7 +27,7 @@ fun AppNavGraph(
         modifier = Modifier.padding(innerPadding)
     ) {
         composable(NavRoutes.DASHBOARD) {
-            DashboardScreen()
+            DashboardScreen(navController = navController)
         }
         composable(NavRoutes.FOCUS_MODE) {
             FocusModeScreen()

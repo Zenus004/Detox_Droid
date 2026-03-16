@@ -1,5 +1,7 @@
 package com.detox.detox_droid.presentation.viewmodels
 
+import android.app.Application
+import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.detox.detox_droid.data.local.datastore.SecureSettingsManager
@@ -39,6 +41,7 @@ private val ALL_KNOWN_SOCIAL_APPS = listOf(
 
 @HiltViewModel
 class DoomScrollingViewModel @Inject constructor(
+    private val application: Application,
     private val secureSettingsManager: SecureSettingsManager
 ) : ViewModel() {
 
@@ -59,7 +62,18 @@ class DoomScrollingViewModel @Inject constructor(
         viewModelScope.launch {
             secureSettingsManager.doomScrollTrackedApps.collectLatest { trackedCsv ->
                 val trackedSet = trackedCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-                val apps = ALL_KNOWN_SOCIAL_APPS.map { app ->
+                
+                val pm = application.packageManager
+                val installedApps = ALL_KNOWN_SOCIAL_APPS.filter { app ->
+                    try {
+                        pm.getApplicationInfo(app.packageName, 0)
+                        true
+                    } catch (_: PackageManager.NameNotFoundException) {
+                        false
+                    }
+                }
+                
+                val apps = installedApps.map { app ->
                     app.copy(isTracked = app.packageName in trackedSet)
                 }
                 _uiState.update { it.copy(trackedApps = apps) }

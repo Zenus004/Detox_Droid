@@ -1,6 +1,7 @@
 package com.detox.detox_droid.data.services
 
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -10,6 +11,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.max
+import kotlin.math.min
 
 @Singleton
 class UsageStatsHelper @Inject constructor(
@@ -21,11 +24,20 @@ class UsageStatsHelper @Inject constructor(
 
     fun hasUsageStatsPermission(): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = appOps.unsafeCheckOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            context.packageName
-        )
+        val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                Process.myUid(),
+                context.packageName
+            )
+        }
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
@@ -33,35 +45,99 @@ class UsageStatsHelper @Inject constructor(
         if (!hasUsageStatsPermission()) return emptyList()
 
         val calendar = Calendar.getInstance()
-        val endTime = calendar.timeInMillis
         calendar.set(Calendar.HOUR_OF_DAY, 0)
         calendar.set(Calendar.MINUTE, 0)
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
         val startTime = calendar.timeInMillis
+        val endTime = System.currentTimeMillis()
 
-        val statsMap = usageStatsManager.queryAndAggregateUsageStats(
-            startTime,
-            endTime
-        )
+        // To handle apps that were already open at midnight, we query events from 24h ago
+        // but only count time spent after the 'startTime' (midnight).
+        val queryStartTime = startTime - (24 * 3600 * 1000L)
+        val events = usageStatsManager.queryEvents(queryStartTime, endTime)
 
-        val appUsageList = mutableListOf<AppUsage>()
-
-        statsMap?.values?.filter { it.totalTimeInForeground > 0 }?.forEach { usageStat ->
-            val appName = try {
-                val appInfo = packageManager.getApplicationInfo(usageStat.packageName, 0)
-                packageManager.getApplicationLabel(appInfo).toString()
-            } catch (e: PackageManager.NameNotFoundException) {
-                usageStat.packageName
+        class TimeRange(var start: Long, var end: Long)
+        val packageRanges = mutableMapOf<String, MutableList<TimeRange>>()
+        val activeActivities = mutableMapOf<String, Long>()
+        val lastUsedTime = mutableMapOf<String, Long>()
+        
+        val event = UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val pkg = event.packageName
+            val className = event.className ?: "unknown_class"
+            
+            val eventKey = "$pkg:$className"
+            
+            when (event.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    val existingStart = activeActivities[eventKey]
+                    if (existingStart != null) {
+                        // Force close the previous interval if another resume happens without pause
+                        val sessionStart = max(existingStart, startTime)
+                        val sessionEnd = min(event.timeStamp, endTime)
+                        if (sessionEnd > sessionStart) {
+                            packageRanges.getOrPut(pkg) { mutableListOf() }.add(TimeRange(sessionStart, sessionEnd))
+                        }
+                    }
+                    activeActivities[eventKey] = event.timeStamp
+                    lastUsedTime[pkg] = max(lastUsedTime[pkg] ?: 0L, event.timeStamp)
+                }
+                UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED -> {
+                    val resumedTime = activeActivities.remove(eventKey)
+                    if (resumedTime != null) {
+                        val sessionStart = max(resumedTime, startTime)
+                        val sessionEnd = min(event.timeStamp, endTime)
+                        if (sessionEnd > sessionStart) {
+                            packageRanges.getOrPut(pkg) { mutableListOf() }.add(TimeRange(sessionStart, sessionEnd))
+                        }
+                    }
+                }
             }
-            appUsageList.add(
-                AppUsage(
-                    packageName = usageStat.packageName,
-                    appName = appName,
-                    totalTimeInForeground = usageStat.totalTimeInForeground,
-                    lastTimeUsed = usageStat.lastTimeUsed
-                )
-            )
+        }
+
+        // Handle apps currently in foreground
+        for ((eventKey, resumedTime) in activeActivities) {
+            val pkg = eventKey.substringBefore(":")
+            val sessionStart = max(resumedTime, startTime)
+            if (endTime > sessionStart) {
+                packageRanges.getOrPut(pkg) { mutableListOf() }.add(TimeRange(sessionStart, endTime))
+            }
+        }
+
+        // Merge intervals to prevent double-counting overlapping activities
+        val totalTimeMap = mutableMapOf<String, Long>()
+        for ((pkg, ranges) in packageRanges) {
+            if (ranges.isEmpty()) continue
+            
+            ranges.sortBy { it.start }
+            var totalPackageTime = 0L
+            var currentStart = ranges[0].start
+            var currentEnd = ranges[0].end
+
+            for (i in 1 until ranges.size) {
+                val range = ranges[i]
+                if (range.start <= currentEnd) {
+                    currentEnd = max(currentEnd, range.end)
+                } else {
+                    totalPackageTime += (currentEnd - currentStart)
+                    currentStart = range.start
+                    currentEnd = range.end
+                }
+            }
+            totalPackageTime += (currentEnd - currentStart)
+            totalTimeMap[pkg] = totalPackageTime
+        }
+
+        val appUsageList = totalTimeMap.map { (pkg, totalTime) ->
+            val appName = try {
+                val appInfo = packageManager.getApplicationInfo(pkg, 0)
+                packageManager.getApplicationLabel(appInfo).toString()
+            } catch (_: PackageManager.NameNotFoundException) {
+                pkg
+            }
+            AppUsage(pkg, appName, totalTime, lastUsedTime[pkg] ?: 0L)
         }
 
         val homeIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
@@ -72,7 +148,8 @@ class UsageStatsHelper @Inject constructor(
             .toSet()
 
         return appUsageList
-            .filter { it.packageName != context.packageName && !launcherPackages.contains(it.packageName) } // exclude DetoxDroid and launchers
+            .filter { it.totalTimeInForeground > 0 }
+            .filter { it.packageName != context.packageName && !launcherPackages.contains(it.packageName) }
             .sortedByDescending { it.totalTimeInForeground }
     }
 }

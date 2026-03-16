@@ -294,43 +294,41 @@ private fun GuardStatusCard(isEnabled: Boolean, onToggle: (Boolean) -> Unit) {
             modifier = Modifier
                 .padding(horizontal = 20.dp, vertical = 18.dp)
                 .fillMaxWidth(),
-            verticalAlignment   = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Icon badge
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(
-                            if (isEnabled) SecondaryNeon.copy(alpha = 0.12f)
-                            else SurfaceVariant
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.RemoveRedEye,
-                        contentDescription = null,
-                        tint     = if (isEnabled) SecondaryNeon else TextGray,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(14.dp))
-                Column {
-                    Text(
-                        text       = "Guard Status",
-                        style      = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color      = TextLight
-                    )
-                    Text(
-                        text  = if (isEnabled) "Active — monitoring tracked apps" else "Disabled",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isEnabled) SecondaryNeon else TextGray
-                    )
-                }
+            // Icon badge
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(
+                        if (isEnabled) SecondaryNeon.copy(alpha = 0.12f)
+                        else SurfaceVariant
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.RemoveRedEye,
+                    contentDescription = null,
+                    tint     = if (isEnabled) SecondaryNeon else TextGray,
+                    modifier = Modifier.size(22.dp)
+                )
             }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text       = "Guard Status",
+                    style      = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = TextLight
+                )
+                Text(
+                    text  = if (isEnabled) "Active — monitoring tracked apps" else "Disabled",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isEnabled) SecondaryNeon else TextGray
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Switch(
                 checked         = isEnabled,
                 onCheckedChange = onToggle,
@@ -376,44 +374,55 @@ private fun ThresholdSliderCard(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
 
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text  = "INTERVENTION THRESHOLD",
+                    style = OverlineTextStyle,
+                    color = TextMuted
+                )
+                Text(
+                    text  = "Overlay appears after this long in one app",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextGray,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            // Animated value badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(valueColor.copy(alpha = 0.12f))
+                    .border(
+                        1.dp,
+                        valueColor.copy(alpha = 0.35f),
+                        RoundedCornerShape(percent = 50)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Column {
-                    Text(
-                        text  = "INTERVENTION THRESHOLD",
-                        style = OverlineTextStyle,
-                        color = TextMuted
-                    )
-                    Text(
-                        text  = "Overlay appears after this long in one app",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextGray,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-                // Animated value badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(valueColor.copy(alpha = 0.12f))
-                        .border(
-                            1.dp,
-                            valueColor.copy(alpha = 0.35f),
-                            RoundedCornerShape(percent = 50)
-                        )
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text       = "$thresholdMinutes min",
+                        text       = "$thresholdMinutes",
                         style      = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Black,
                         color      = valueColor
                     )
+                    Text(
+                        text       = "min",
+                        style      = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color      = valueColor
+                    )
                 }
             }
+        }
 
             Spacer(modifier = Modifier.height(20.dp))
 

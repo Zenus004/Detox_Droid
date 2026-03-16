@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -97,72 +98,79 @@ fun ScheduleScreen(
             .fillMaxSize()
             .background(BackgroundDeepest)
     ) {
-        // ── Ambient orbs ───────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .size(260.dp)
-                    .align(Alignment.TopEnd)
-                    .blur(120.dp)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(PurpleAccent.copy(alpha = 0.12f), Color.Transparent)
-                        ),
-                        CircleShape
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .size(200.dp)
-                    .align(Alignment.BottomStart)
-                    .blur(100.dp)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(PrimaryNeonDim, Color.Transparent)
-                        ),
-                        CircleShape
-                    )
-            )
-
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-
-                // ── Header ────────────────────────────────────────────
+                // ── Header & Ambient Backgrounds ──────────────────────
                 item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        PurpleAccent.copy(alpha = 0.08f),
-                                        Color.Transparent
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        // 1. Actual Header Content (This determines the item height)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            PurpleAccent.copy(alpha = 0.08f),
+                                            Color.Transparent
+                                        )
                                     )
                                 )
-                            )
-                            .padding(horizontal = 20.dp, vertical = 28.dp)
-                    ) {
-                        Column {
-                            Text(
-                                text       = "Automated Detox",
-                                color      = TextLight,
-                                style      = MaterialTheme.typography.headlineLarge,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text  = "Schedules auto-start Focus Mode at set times",
-                                color = TextMuted,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
+                                .padding(horizontal = 20.dp)
+                                .padding(top = 32.dp, bottom = 12.dp) // Tidier padding
+                        ) {
+                            Column {
+                                Text(
+                                    text       = "Automated Detox",
+                                    color      = TextLight,
+                                    style      = MaterialTheme.typography.headlineLarge,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text  = "Schedules auto-start Focus Mode at set times",
+                                    color = TextMuted,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .width(48.dp)
+                                        .height(2.dp)
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(PurpleAccent, PrimaryNeon)
+                                            ),
+                                            RoundedCornerShape(1.dp)
+                                        )
+                                )
+                            }
+                        }
+
+                        // 2. Ambient Decorations (matchParentSize ensures they don't push content)
+                        Box(modifier = Modifier.matchParentSize()) {
                             Box(
                                 modifier = Modifier
-                                    .width(48.dp)
-                                    .height(2.dp)
+                                    .size(260.dp)
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 40.dp, y = (-20).dp)
+                                    .blur(120.dp)
                                     .background(
-                                        Brush.horizontalGradient(
-                                            listOf(PurpleAccent, PrimaryNeon)
+                                        Brush.radialGradient(
+                                            colors = listOf(PurpleAccent.copy(alpha = 0.12f), Color.Transparent)
                                         ),
-                                        RoundedCornerShape(1.dp)
+                                        CircleShape
+                                    )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(200.dp)
+                                    .align(Alignment.BottomStart)
+                                    .offset(x = (-40).dp, y = 140.dp)
+                                    .blur(100.dp)
+                                    .background(
+                                        Brush.radialGradient(
+                                            colors = listOf(PrimaryNeonDim, Color.Transparent)
+                                        ),
+                                        CircleShape
                                     )
                             )
                         }
