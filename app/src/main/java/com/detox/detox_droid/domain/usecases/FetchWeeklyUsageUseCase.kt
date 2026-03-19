@@ -12,6 +12,6 @@ class FetchWeeklyUsageUseCase @Inject constructor(
     suspend operator fun invoke(): List<AppUsage> = withContext(Dispatchers.IO) {
         // We reuse daily stats fetching structure but for expanding it we can add INTERVAL_WEEKLY in UsageStatsHelper.
         // For now, this invokes the daily usage stats as placeholder.
-        usageStatsHelper.getDailyUsageStats()
+        usageStatsHelper.getWeeklyUsageStats()
     }
 }

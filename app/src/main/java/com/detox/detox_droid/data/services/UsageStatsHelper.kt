@@ -52,8 +52,61 @@ class UsageStatsHelper @Inject constructor(
         val startTime = calendar.timeInMillis
         val endTime = System.currentTimeMillis()
 
-        // To handle apps that were already open at midnight, we query events from 24h ago
-        // but only count time spent after the 'startTime' (midnight).
+        return getUsageStatsFromEvents(startTime, endTime)
+    }
+
+    fun getWeeklyUsageStats(): List<AppUsage> {
+        if (!hasUsageStatsPermission()) return emptyList()
+
+        val calendar = Calendar.getInstance()
+        
+        // Find the start of the current week (Monday)
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        
+        // By default Calendar.getInstance() might use Sunday depending on locale.
+        // We force Monday as the start of "This Week" for insights.
+        calendar.firstDayOfWeek = Calendar.MONDAY
+        calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+        
+        val startTime = calendar.timeInMillis
+        val endTime = System.currentTimeMillis()
+
+        // Use queryUsageStats for weekly history. It's pre-aggregated by the OS 
+        // and persists much longer than raw UsageEvents.
+        val stats = usageStatsManager.queryUsageStats(
+            UsageStatsManager.INTERVAL_DAILY,
+            startTime,
+            endTime
+        )
+
+        if (stats.isNullOrEmpty()) return emptyList()
+
+        // Aggregate stats by package
+        val packageTimeMap = mutableMapOf<String, Long>()
+        val packageLastUsedMap = mutableMapOf<String, Long>()
+
+        for (uStat in stats) {
+            val pkg = uStat.packageName
+            val time = uStat.totalTimeInForeground
+            if (time > 0) {
+                packageTimeMap[pkg] = (packageTimeMap[pkg] ?: 0L) + time
+                packageLastUsedMap[pkg] = max(packageLastUsedMap[pkg] ?: 0L, uStat.lastTimeUsed)
+            }
+        }
+
+        val appUsageList = packageTimeMap.map { (pkg, totalTime) ->
+            val appName = getAppName(pkg)
+            AppUsage(pkg, appName, totalTime, packageLastUsedMap[pkg] ?: 0L)
+        }
+
+        return filterAndSortUsage(appUsageList)
+    }
+
+    private fun getUsageStatsFromEvents(startTime: Long, endTime: Long): List<AppUsage> {
+        // High-precision event-based logic for Daily tracking
         val queryStartTime = startTime - (24 * 3600 * 1000L)
         val events = usageStatsManager.queryEvents(queryStartTime, endTime)
 
@@ -131,15 +184,23 @@ class UsageStatsHelper @Inject constructor(
         }
 
         val appUsageList = totalTimeMap.map { (pkg, totalTime) ->
-            val appName = try {
-                val appInfo = packageManager.getApplicationInfo(pkg, 0)
-                packageManager.getApplicationLabel(appInfo).toString()
-            } catch (_: PackageManager.NameNotFoundException) {
-                pkg
-            }
+            val appName = getAppName(pkg)
             AppUsage(pkg, appName, totalTime, lastUsedTime[pkg] ?: 0L)
         }
 
+        return filterAndSortUsage(appUsageList)
+    }
+
+    private fun getAppName(pkg: String): String {
+        return try {
+            val appInfo = packageManager.getApplicationInfo(pkg, 0)
+            packageManager.getApplicationLabel(appInfo).toString()
+        } catch (_: PackageManager.NameNotFoundException) {
+            pkg
+        }
+    }
+
+    private fun filterAndSortUsage(usageList: List<AppUsage>): List<AppUsage> {
         val homeIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
             addCategory(android.content.Intent.CATEGORY_HOME)
         }
@@ -147,7 +208,7 @@ class UsageStatsHelper @Inject constructor(
             .map { it.activityInfo.packageName }
             .toSet()
 
-        return appUsageList
+        return usageList
             .filter { it.totalTimeInForeground > 0 }
             .filter { it.packageName != context.packageName && !launcherPackages.contains(it.packageName) }
             .sortedByDescending { it.totalTimeInForeground }

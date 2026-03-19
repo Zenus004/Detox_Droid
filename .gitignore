@@ -1,6 +1,8 @@
 *.iml
 .gradle
 .idea
+.kotlin
+/.gradle
 /local.properties
 /.idea/caches
 /.idea/libraries
@@ -14,3 +16,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Testing & Coverage
+/app/build/reports/jacoco/
+/app/build/outputs/code_coverage/
+/app/build/outputs/unit_test_code_coverage/

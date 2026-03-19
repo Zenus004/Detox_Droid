@@ -1,7 +1,6 @@
 package com.detox.detox_droid.presentation.screens
 
 import android.content.Intent
-import androidx.core.net.toUri
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,13 +63,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.navigation.NavController
 import com.detox.detox_droid.domain.models.AppUsage
+import com.detox.detox_droid.presentation.navigation.NavRoutes
 import com.detox.detox_droid.presentation.viewmodels.DashboardViewModel
 import com.detox.detox_droid.ui.theme.BackgroundDeepest
 import com.detox.detox_droid.ui.theme.DividerSubtle
@@ -94,11 +97,12 @@ private val CHART_COLORS = listOf(
     Color(0xFF50FA7B), // green
     Color(0xFFFFB86C), // orange
     Color(0xFFBD93F9), // purple
-    Color(0xFFFF5555), // red
+    Color(0xFF6272A4), // Other
 )
 
 @Composable
 fun DashboardScreen(
+    navController: NavController,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -119,92 +123,97 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(BackgroundDeepest)
     ) {
-        Box(
-            modifier = Modifier
-                .size(280.dp)
-                .offset(x = (-60).dp, y = (-40).dp)
-                .blur(radius = 120.dp)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(PrimaryNeonDim, Color.Transparent)
-                    ),
-                    shape = CircleShape
-                )
-        )
-        Box(
-            modifier = Modifier
-                .size(200.dp)
-                .align(Alignment.BottomEnd)
-                .offset(x = 60.dp, y = 60.dp)
-                .blur(radius = 100.dp)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(PurpleAccent.copy(alpha = 0.15f), Color.Transparent)
-                    ),
-                    shape = CircleShape
-                )
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // ── Header ───────────────────────────────────────────────────────
-            DashboardHeader()
+            Box(modifier = Modifier.fillMaxWidth()) {
+                // ── Ambient background orbs (now inside scrollable container) ──
+                Box(
+                    modifier = Modifier
+                        .size(280.dp)
+                        .offset(x = (-60).dp, y = (-40).dp)
+                        .blur(radius = 120.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(PrimaryNeonDim, Color.Transparent)
+                            ),
+                            shape = CircleShape
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 60.dp, y = 160.dp) // Explicit x and y
+                        .blur(radius = 100.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(PurpleAccent.copy(alpha = 0.15f), Color.Transparent)
+                            ),
+                            shape = CircleShape
+                        )
+                )
 
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Column {
+                    // ── Header ───────────────────────────────────────────────────────
+                    DashboardHeader(navController = navController)
 
-                // ── Permission banners ────────────────────────────────────────
-                if (!state.hasUsagePermission) {
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically()
-                    ) {
-                        UsagePermissionCard()
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+
+                        // ── Permission banners ────────────────────────────────────────
+                        if (!state.hasUsagePermission) {
+                            AnimatedVisibility(
+                                visible = true,
+                                enter = fadeIn() + slideInVertically()
+                            ) {
+                                UsagePermissionCard()
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                        if (!state.hasAccessibilityPermission) {
+                            AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically()) {
+                                AccessibilityPermissionCard()
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                        if (!state.hasOverlayPermission) {
+                            AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically()) {
+                                OverlayPermissionCard()
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        // ── Loading state ─────────────────────────────────────────────
+                        if (state.isLoading && state.topUsedApps.isEmpty() && state.hasUsagePermission) {
+                            LoadingState()
+                        } else if (
+                            state.hasUsagePermission &&
+                            state.hasAccessibilityPermission &&
+                            state.hasOverlayPermission
+                        ) {
+                            // ── Detox status card ─────────────────────────────────────
+                            DetoxStatusCard(isDetoxActive = state.isDetoxActive)
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // ── Screen time donut ─────────────────────────────────────
+                            ScreenTimeDonutCard(
+                                totalScreenTimeMs = state.totalScreenTimeMs,
+                                apps = state.topUsedApps
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // ── Top apps breakdown ────────────────────────────────────
+                            TopAppsBreakdownCard(
+                                apps = state.topUsedApps,
+                                totalMs = state.totalScreenTimeMs
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(120.dp)) // Extra space for FAB/Nav
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
-                if (!state.hasAccessibilityPermission) {
-                    AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically()) {
-                        AccessibilityPermissionCard()
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-                if (!state.hasOverlayPermission) {
-                    AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically()) {
-                        OverlayPermissionCard()
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                // ── Loading state ─────────────────────────────────────────────
-                if (state.isLoading && state.topUsedApps.isEmpty() && state.hasUsagePermission) {
-                    LoadingState()
-                } else if (
-                    state.hasUsagePermission &&
-                    state.hasAccessibilityPermission &&
-                    state.hasOverlayPermission
-                ) {
-                    // ── Detox status card ─────────────────────────────────────
-                    DetoxStatusCard(isDetoxActive = state.isDetoxActive)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // ── Screen time donut ─────────────────────────────────────
-                    ScreenTimeDonutCard(
-                        totalScreenTimeMs = state.totalScreenTimeMs,
-                        apps = state.topUsedApps
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // ── Top apps breakdown ────────────────────────────────────
-                    TopAppsBreakdownCard(
-                        apps = state.topUsedApps,
-                        totalMs = state.totalScreenTimeMs
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -213,7 +222,7 @@ fun DashboardScreen(
 // ── Header ────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun DashboardHeader() {
+private fun DashboardHeader(navController: NavController) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -227,32 +236,54 @@ private fun DashboardHeader() {
             )
             .padding(horizontal = 20.dp, vertical = 28.dp)
     ) {
-        Column {
-            Text(
-                text = "Dashboard",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = TextLight
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Your digital wellbeing at a glance",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextMuted
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            // Neon divider
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column {
+                Text(
+                    text = "Dashboard",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = TextLight
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Your digital wellbeing at a glance",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                // Neon divider
+                Box(
+                    modifier = Modifier
+                        .width(48.dp)
+                        .height(2.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(PrimaryNeon, SecondaryNeon)
+                            ),
+                            shape = RoundedCornerShape(1.dp)
+                        )
+                )
+            }
+            
             Box(
                 modifier = Modifier
-                    .width(48.dp)
-                    .height(2.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(PrimaryNeon, SecondaryNeon)
-                        ),
-                        shape = RoundedCornerShape(1.dp)
-                    )
-            )
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(PrimaryNeon.copy(alpha = 0.1f))
+                    .clickable { navController.navigate(NavRoutes.STATISTICS) },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.BarChart,
+                    contentDescription = "View Statistics",
+                    tint = PrimaryNeon,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }
@@ -349,7 +380,7 @@ fun DetoxStatusCard(isDetoxActive: Boolean) {
                     )
                 }
                 Spacer(modifier = Modifier.width(14.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Focus Mode",
                         color = TextLight,
@@ -398,12 +429,22 @@ fun ScreenTimeDonutCard(totalScreenTimeMs: Long, apps: List<AppUsage>) {
     val hours   = TimeUnit.MILLISECONDS.toHours(totalScreenTimeMs)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(totalScreenTimeMs) % 60
 
+    val donutApps = remember(apps, totalScreenTimeMs) {
+        val topAppsSum = apps.sumOf { it.totalTimeInForeground }
+        val remaining = totalScreenTimeMs - topAppsSum
+        if (remaining > 0 && apps.isNotEmpty()) {
+            apps + AppUsage("com.detox.other", "Other", remaining, 0L)
+        } else {
+            apps
+        }
+    }
+
     val animProgress = remember { Animatable(0f) }
-    LaunchedEffect(apps) {
+    LaunchedEffect(donutApps) {
         animProgress.animateTo(1f, tween(durationMillis = 1200, easing = LinearOutSlowInEasing))
     }
 
-    var selectedIndex by remember(apps) { mutableIntStateOf(-1) }
+    var selectedIndex by remember(donutApps) { mutableIntStateOf(-1) }
 
     Box(
         modifier = Modifier
@@ -475,7 +516,7 @@ fun ScreenTimeDonutCard(totalScreenTimeMs: Long, apps: List<AppUsage>) {
                     contentAlignment = Alignment.Center
                 ) {
                     DonutChart(
-                        apps = apps,
+                        apps = donutApps,
                         totalMs = totalScreenTimeMs,
                         animProgress = animProgress.value,
                         selectedIndex = selectedIndex,
@@ -484,16 +525,16 @@ fun ScreenTimeDonutCard(totalScreenTimeMs: Long, apps: List<AppUsage>) {
 
                     // Center label
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val centerLabel = if (selectedIndex >= 0 && selectedIndex < apps.size) {
-                            val app = apps[selectedIndex]
+                        val centerLabel = if (selectedIndex >= 0 && selectedIndex < donutApps.size) {
+                            val app = donutApps[selectedIndex]
                             val h = TimeUnit.MILLISECONDS.toHours(app.totalTimeInForeground)
                             val m = TimeUnit.MILLISECONDS.toMinutes(app.totalTimeInForeground) % 60
                             if (h > 0) "${h}h ${m}m" else "${m}m"
                         } else {
                             if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
                         }
-                        val centerName = if (selectedIndex >= 0 && selectedIndex < apps.size)
-                            apps[selectedIndex].appName.take(9)
+                        val centerName = if (selectedIndex >= 0 && selectedIndex < donutApps.size)
+                            donutApps[selectedIndex].appName.take(9)
                         else "Total"
 
                         Text(
@@ -518,7 +559,7 @@ fun ScreenTimeDonutCard(totalScreenTimeMs: Long, apps: List<AppUsage>) {
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    apps.take(CHART_COLORS.size).forEachIndexed { index, app ->
+                    donutApps.take(CHART_COLORS.size).forEachIndexed { index, app ->
                         val color = CHART_COLORS[index % CHART_COLORS.size]
                         val isSelected = selectedIndex == index
                         LegendRow(
@@ -985,6 +1026,3 @@ private fun BasePermissionCard(title: String, description: String, onClick: () -
     }
 }
 
-// ── Offset extension helper
-private fun Modifier.offset(x: Dp = 0.dp, y: Dp = 0.dp): Modifier =
-    this.padding(start = x.coerceAtLeast(0.dp), top = y.coerceAtLeast(0.dp))
