@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.QueryStats
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -186,7 +187,10 @@ fun StatisticsScreen(
                 // ── Total weekly screen time hero card ────────────────────────
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        WeeklyHeroCard(totalScreenTimeMs = state.totalWeeklyTimeMs)
+                        WeeklyHeroCard(
+                            totalScreenTimeMs = state.totalWeeklyTimeMs,
+                            previousWeeklyTimeMs = state.previousWeeklyTimeMs
+                        )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
@@ -362,7 +366,7 @@ fun StatisticsScreen(
 
 
 @Composable
-private fun WeeklyHeroCard(totalScreenTimeMs: Long) {
+private fun WeeklyHeroCard(totalScreenTimeMs: Long, previousWeeklyTimeMs: Long) {
     val hours   = TimeUnit.MILLISECONDS.toHours(totalScreenTimeMs)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(totalScreenTimeMs) % 60
 
@@ -439,18 +443,22 @@ private fun WeeklyHeroCard(totalScreenTimeMs: Long) {
                     )
                 }
 
+                val isTrendingUp = totalScreenTimeMs > previousWeeklyTimeMs
+                val trendColor = if (isTrendingUp) ChartRed else PrimaryNeon
+                val trendIcon = if (isTrendingUp) Icons.AutoMirrored.Rounded.TrendingUp else Icons.AutoMirrored.Rounded.TrendingDown
+                
                 Box(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(PrimaryNeon.copy(alpha = 0.10f))
-                        .border(1.dp, PrimaryNeon.copy(alpha = 0.25f), RoundedCornerShape(16.dp)),
+                        .background(trendColor.copy(alpha = 0.10f))
+                        .border(1.dp, trendColor.copy(alpha = 0.25f), RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.TrendingDown,
+                        imageVector = trendIcon,
                         contentDescription = null,
-                        tint     = PrimaryNeon,
+                        tint     = trendColor,
                         modifier = Modifier.size(28.dp)
                     )
                 }

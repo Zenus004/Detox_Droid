@@ -105,6 +105,46 @@ class UsageStatsHelper @Inject constructor(
         return filterAndSortUsage(appUsageList)
     }
 
+    fun getPreviousWeekTotalTime(): Long {
+        if (!hasUsageStatsPermission()) return 0L
+
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        calendar.firstDayOfWeek = Calendar.MONDAY
+        calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+        
+        val endTime = calendar.timeInMillis
+        calendar.add(Calendar.DAY_OF_YEAR, -7)
+        val startTime = calendar.timeInMillis
+
+        val stats = usageStatsManager.queryUsageStats(
+            UsageStatsManager.INTERVAL_DAILY,
+            startTime,
+            endTime
+        )
+
+        if (stats.isNullOrEmpty()) return 0L
+
+        val packageTimeMap = mutableMapOf<String, Long>()
+
+        for (uStat in stats) {
+            val pkg = uStat.packageName
+            val time = uStat.totalTimeInForeground
+            if (time > 0) {
+                packageTimeMap[pkg] = (packageTimeMap[pkg] ?: 0L) + time
+            }
+        }
+
+        val appUsageList = packageTimeMap.map { (pkg, totalTime) ->
+            AppUsage(pkg, pkg, totalTime, 0L)
+        }
+
+        return filterAndSortUsage(appUsageList).sumOf { it.totalTimeInForeground }
+    }
+
     private fun getUsageStatsFromEvents(startTime: Long, endTime: Long): List<AppUsage> {
         // High-precision event-based logic for Daily tracking
         val queryStartTime = startTime - (24 * 3600 * 1000L)

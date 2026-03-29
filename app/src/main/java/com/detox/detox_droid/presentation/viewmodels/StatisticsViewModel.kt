@@ -15,6 +15,7 @@ import javax.inject.Inject
 data class StatisticsState(
     val weeklyUsage: List<AppUsage> = emptyList(),
     val totalWeeklyTimeMs: Long = 0L,
+    val previousWeeklyTimeMs: Long = 0L,
     val isLoading: Boolean = true
 )
 
@@ -40,10 +41,12 @@ class StatisticsViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
             val apps = fetchWeeklyUsageUseCase()
             val totalTime = apps.sumOf { it.totalTimeInForeground }
+            val previousTotalTime = usageStatsHelper.getPreviousWeekTotalTime()
             _uiState.update { 
                 it.copy(
                     weeklyUsage = apps, 
                     totalWeeklyTimeMs = totalTime, 
+                    previousWeeklyTimeMs = previousTotalTime,
                     isLoading = false
                 ) 
             }
