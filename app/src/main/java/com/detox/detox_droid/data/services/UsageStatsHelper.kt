@@ -58,7 +58,12 @@ class UsageStatsHelper @Inject constructor(
 
         val appUsageList = stats.map { (pkg, uStat) ->
             val appName = getAppName(pkg)
-            AppUsage(pkg, appName, uStat.totalTimeInForeground, uStat.lastTimeUsed)
+            val time = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                uStat.totalTimeVisible
+            } else {
+                uStat.totalTimeInForeground
+            }
+            AppUsage(pkg, appName, time, uStat.lastTimeUsed)
         }.filter { it.totalTimeInForeground > 0 }
 
         return filterAndSortUsage(appUsageList)
@@ -99,10 +104,14 @@ class UsageStatsHelper @Inject constructor(
 
         for (uStat in stats) {
             val pkg = uStat.packageName
-            val time = uStat.totalTimeInForeground
+            val time = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                uStat.totalTimeVisible
+            } else {
+                uStat.totalTimeInForeground
+            }
             if (time > 0) {
                 packageTimeMap[pkg] = (packageTimeMap[pkg] ?: 0L) + time
-                packageLastUsedMap[pkg] = max(packageLastUsedMap[pkg] ?: 0L, uStat.lastTimeUsed)
+                packageLastUsedMap[pkg] = kotlin.math.max(packageLastUsedMap[pkg] ?: 0L, uStat.lastTimeUsed)
             }
         }
 
@@ -141,7 +150,11 @@ class UsageStatsHelper @Inject constructor(
 
         for (uStat in stats) {
             val pkg = uStat.packageName
-            val time = uStat.totalTimeInForeground
+            val time = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                uStat.totalTimeVisible
+            } else {
+                uStat.totalTimeInForeground
+            }
             if (time > 0) {
                 packageTimeMap[pkg] = (packageTimeMap[pkg] ?: 0L) + time
             }
@@ -153,6 +166,8 @@ class UsageStatsHelper @Inject constructor(
 
         return filterAndSortUsage(appUsageList).sumOf { it.totalTimeInForeground }
     }
+
+
 
 
 
@@ -169,12 +184,23 @@ class UsageStatsHelper @Inject constructor(
         val homeIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
             addCategory(android.content.Intent.CATEGORY_HOME)
         }
+        // Exclude launcher apps mathematically
         val launcherPackages = packageManager.queryIntentActivities(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
             .map { it.activityInfo.packageName }
             .toSet()
 
+        // Match all true launchable apps rigorously using MATCH_ALL (or 0) so no social apps drop off
+        val launchIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+            addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+        }
+        val userLaunchablePackages = packageManager.queryIntentActivities(
+            launchIntent, 
+            PackageManager.MATCH_ALL
+        ).map { it.activityInfo.packageName }.toSet()
+
         return usageList
             .filter { it.totalTimeInForeground > 0 }
+            .filter { userLaunchablePackages.contains(it.packageName) }
             .filter { it.packageName != context.packageName && !launcherPackages.contains(it.packageName) }
             .sortedByDescending { it.totalTimeInForeground }
     }
