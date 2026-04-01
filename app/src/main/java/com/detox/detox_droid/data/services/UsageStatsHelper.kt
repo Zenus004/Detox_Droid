@@ -52,7 +52,16 @@ class UsageStatsHelper @Inject constructor(
         val startTime = calendar.timeInMillis
         val endTime = System.currentTimeMillis()
 
-        return getUsageStatsFromEvents(startTime, endTime)
+        val stats = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
+
+        if (stats.isNullOrEmpty()) return emptyList()
+
+        val appUsageList = stats.map { (pkg, uStat) ->
+            val appName = getAppName(pkg)
+            AppUsage(pkg, appName, uStat.totalTimeInForeground, uStat.lastTimeUsed)
+        }.filter { it.totalTimeInForeground > 0 }
+
+        return filterAndSortUsage(appUsageList)
     }
 
     fun getWeeklyUsageStats(): List<AppUsage> {
@@ -145,91 +154,7 @@ class UsageStatsHelper @Inject constructor(
         return filterAndSortUsage(appUsageList).sumOf { it.totalTimeInForeground }
     }
 
-    private fun getUsageStatsFromEvents(startTime: Long, endTime: Long): List<AppUsage> {
-        // High-precision event-based logic for Daily tracking
-        val queryStartTime = startTime - (24 * 3600 * 1000L)
-        val events = usageStatsManager.queryEvents(queryStartTime, endTime)
 
-        class TimeRange(var start: Long, var end: Long)
-        val packageRanges = mutableMapOf<String, MutableList<TimeRange>>()
-        val activeActivities = mutableMapOf<String, Long>()
-        val lastUsedTime = mutableMapOf<String, Long>()
-        
-        val event = UsageEvents.Event()
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
-            val pkg = event.packageName
-            val className = event.className ?: "unknown_class"
-            
-            val eventKey = "$pkg:$className"
-            
-            when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> {
-                    val existingStart = activeActivities[eventKey]
-                    if (existingStart != null) {
-                        // Force close the previous interval if another resume happens without pause
-                        val sessionStart = max(existingStart, startTime)
-                        val sessionEnd = min(event.timeStamp, endTime)
-                        if (sessionEnd > sessionStart) {
-                            packageRanges.getOrPut(pkg) { mutableListOf() }.add(TimeRange(sessionStart, sessionEnd))
-                        }
-                    }
-                    activeActivities[eventKey] = event.timeStamp
-                    lastUsedTime[pkg] = max(lastUsedTime[pkg] ?: 0L, event.timeStamp)
-                }
-                UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED -> {
-                    val resumedTime = activeActivities.remove(eventKey)
-                    if (resumedTime != null) {
-                        val sessionStart = max(resumedTime, startTime)
-                        val sessionEnd = min(event.timeStamp, endTime)
-                        if (sessionEnd > sessionStart) {
-                            packageRanges.getOrPut(pkg) { mutableListOf() }.add(TimeRange(sessionStart, sessionEnd))
-                        }
-                    }
-                }
-            }
-        }
-
-        // Handle apps currently in foreground
-        for ((eventKey, resumedTime) in activeActivities) {
-            val pkg = eventKey.substringBefore(":")
-            val sessionStart = max(resumedTime, startTime)
-            if (endTime > sessionStart) {
-                packageRanges.getOrPut(pkg) { mutableListOf() }.add(TimeRange(sessionStart, endTime))
-            }
-        }
-
-        // Merge intervals to prevent double-counting overlapping activities
-        val totalTimeMap = mutableMapOf<String, Long>()
-        for ((pkg, ranges) in packageRanges) {
-            if (ranges.isEmpty()) continue
-            
-            ranges.sortBy { it.start }
-            var totalPackageTime = 0L
-            var currentStart = ranges[0].start
-            var currentEnd = ranges[0].end
-
-            for (i in 1 until ranges.size) {
-                val range = ranges[i]
-                if (range.start <= currentEnd) {
-                    currentEnd = max(currentEnd, range.end)
-                } else {
-                    totalPackageTime += (currentEnd - currentStart)
-                    currentStart = range.start
-                    currentEnd = range.end
-                }
-            }
-            totalPackageTime += (currentEnd - currentStart)
-            totalTimeMap[pkg] = totalPackageTime
-        }
-
-        val appUsageList = totalTimeMap.map { (pkg, totalTime) ->
-            val appName = getAppName(pkg)
-            AppUsage(pkg, appName, totalTime, lastUsedTime[pkg] ?: 0L)
-        }
-
-        return filterAndSortUsage(appUsageList)
-    }
 
     private fun getAppName(pkg: String): String {
         return try {
