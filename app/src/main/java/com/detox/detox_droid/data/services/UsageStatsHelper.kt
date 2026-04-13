@@ -11,8 +11,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.max
-import kotlin.math.min
 
 @Singleton
 class UsageStatsHelper @Inject constructor(
@@ -52,21 +50,7 @@ class UsageStatsHelper @Inject constructor(
         val startTime = calendar.timeInMillis
         val endTime = System.currentTimeMillis()
 
-        val stats = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
-
-        if (stats.isNullOrEmpty()) return emptyList()
-
-        val appUsageList = stats.map { (pkg, uStat) ->
-            val appName = getAppName(pkg)
-            val time = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                uStat.totalTimeVisible
-            } else {
-                uStat.totalTimeInForeground
-            }
-            AppUsage(pkg, appName, time, uStat.lastTimeUsed)
-        }.filter { it.totalTimeInForeground > 0 }
-
-        return filterAndSortUsage(appUsageList)
+        return getUsageStatsFromEvents(startTime, endTime)
     }
 
     fun getWeeklyUsageStats(): List<AppUsage> {
@@ -79,8 +63,7 @@ class UsageStatsHelper @Inject constructor(
         calendar.set(Calendar.MINUTE, 0)
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
-        
-        // By default Calendar.getInstance() might use Sunday depending on locale.
+
         // We force Monday as the start of "This Week" for insights.
         calendar.firstDayOfWeek = Calendar.MONDAY
         calendar.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
@@ -88,39 +71,7 @@ class UsageStatsHelper @Inject constructor(
         val startTime = calendar.timeInMillis
         val endTime = System.currentTimeMillis()
 
-        // Use queryUsageStats for weekly history. It's pre-aggregated by the OS 
-        // and persists much longer than raw UsageEvents.
-        val stats = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY,
-            startTime,
-            endTime
-        )
-
-        if (stats.isNullOrEmpty()) return emptyList()
-
-        // Aggregate stats by package
-        val packageTimeMap = mutableMapOf<String, Long>()
-        val packageLastUsedMap = mutableMapOf<String, Long>()
-
-        for (uStat in stats) {
-            val pkg = uStat.packageName
-            val time = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                uStat.totalTimeVisible
-            } else {
-                uStat.totalTimeInForeground
-            }
-            if (time > 0) {
-                packageTimeMap[pkg] = (packageTimeMap[pkg] ?: 0L) + time
-                packageLastUsedMap[pkg] = kotlin.math.max(packageLastUsedMap[pkg] ?: 0L, uStat.lastTimeUsed)
-            }
-        }
-
-        val appUsageList = packageTimeMap.map { (pkg, totalTime) ->
-            val appName = getAppName(pkg)
-            AppUsage(pkg, appName, totalTime, packageLastUsedMap[pkg] ?: 0L)
-        }
-
-        return filterAndSortUsage(appUsageList)
+        return getUsageStatsFromEvents(startTime, endTime)
     }
 
     fun getPreviousWeekTotalTime(): Long {
@@ -169,7 +120,73 @@ class UsageStatsHelper @Inject constructor(
 
 
 
+    private fun getUsageStatsFromEvents(startTime: Long, endTime: Long): List<AppUsage> {
+        val queryStartTime = startTime - (24 * 3600 * 1000L)
+        val events = usageStatsManager.queryEvents(queryStartTime, endTime)
 
+        val totalTimeMap = mutableMapOf<String, Long>()
+        val lastUsedTime = mutableMapOf<String, Long>()
+
+        var currentPkg: String? = null
+        var currentPkgStartTime = 0L
+
+        val event = UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val pkg = event.packageName
+            val eventType = event.eventType
+            val timeStamp = event.timeStamp
+
+            // Screen/Device physically goes dormant or user explicitly locks it
+            if (eventType == 16 || eventType == 18) { // SCREEN_NON_INTERACTIVE or KEYGUARD_SHOWN
+                val pkgToClose = currentPkg
+                if (pkgToClose != null) {
+                    val boundedStart = kotlin.math.max(currentPkgStartTime, startTime)
+                    val boundedEnd = kotlin.math.min(timeStamp, endTime)
+                    if (boundedEnd > boundedStart) {
+                        totalTimeMap[pkgToClose] = (totalTimeMap[pkgToClose] ?: 0L) + (boundedEnd - boundedStart)
+                    }
+                    currentPkg = null
+                }
+            } 
+            // Hardware wakeups (15/17) are safely ignored. We defer exclusively to app intents below.
+            
+            // Application strictly seizes the foreground locally
+            else if (eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                // By unequivocally trusting ACTIVITY_RESUMED, we completely immune ourselves against
+                // missing SCREEN_INTERACTIVE (15) signals caused by Under-Display Fingerprint Scanners (UDFPS).
+                if (currentPkg != pkg) {
+                    val pkgToClose = currentPkg
+                    if (pkgToClose != null) {
+                        val boundedStart = kotlin.math.max(currentPkgStartTime, startTime)
+                        val boundedEnd = kotlin.math.min(timeStamp, endTime)
+                        if (boundedEnd > boundedStart) {
+                            totalTimeMap[pkgToClose] = (totalTimeMap[pkgToClose] ?: 0L) + (boundedEnd - boundedStart)
+                        }
+                    }
+                    currentPkg = pkg
+                    currentPkgStartTime = timeStamp
+                }
+                lastUsedTime[pkg] = kotlin.math.max(lastUsedTime[pkg] ?: 0L, timeStamp)
+            }
+        }
+
+        // Close hanging sessions at query boundary
+        val pkgToClose = currentPkg
+        if (pkgToClose != null) {
+            val boundedStart = kotlin.math.max(currentPkgStartTime, startTime)
+            if (endTime > boundedStart) {
+                totalTimeMap[pkgToClose] = (totalTimeMap[pkgToClose] ?: 0L) + (endTime - boundedStart)
+            }
+        }
+
+        val appUsageList = totalTimeMap.map { (pkg, totalTime) ->
+            val appName = getAppName(pkg)
+            AppUsage(pkg, appName, totalTime, lastUsedTime[pkg] ?: 0L)
+        }
+
+        return filterAndSortUsage(appUsageList)
+    }
 
     private fun getAppName(pkg: String): String {
         return try {
